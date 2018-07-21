@@ -3,7 +3,7 @@
 #define MAX_DISTANCE 100.0000000 
 #define ARBITRARY_STEP_SIZE 0.01
 
-float sceneSDF(vec3 p);
+float sceneSDF(vec3 p, int frame);
 
 // @param
 // takes in a point that is within EPSILON of a surface.
@@ -12,11 +12,11 @@ float sceneSDF(vec3 p);
 // the trace() function and figuring out where along the
 // ray is the point
 // @return the surface normal 
-vec3 getSurfaceNormal(vec3 p) {
+vec3 getSurfaceNormal(vec3 p, int frame) {
     return normalize(vec3(
-        sceneSDF(vec3(p.x+EPSILON, p.y, p.z)) - sceneSDF(vec3(p.x-EPSILON, p.y, p.z)),
-        sceneSDF(vec3(p.x, p.y+EPSILON, p.z)) - sceneSDF(vec3(p.x, p.y-EPSILON, p.z)),
-        sceneSDF(vec3(p.x, p.y, p.z+EPSILON)) - sceneSDF(vec3(p.x, p.y, p.z-EPSILON))
+        sceneSDF(vec3(p.x+EPSILON, p.y, p.z), frame) - sceneSDF(vec3(p.x-EPSILON, p.y, p.z), frame),
+        sceneSDF(vec3(p.x, p.y+EPSILON, p.z), frame) - sceneSDF(vec3(p.x, p.y-EPSILON, p.z), frame),
+        sceneSDF(vec3(p.x, p.y, p.z+EPSILON), frame) - sceneSDF(vec3(p.x, p.y, p.z-EPSILON), frame)
         ));
 }
 
@@ -102,7 +102,7 @@ vec3 modShiftZ(vec3 p, float negativeCorrection, float spacingBetweenIteration) 
 
 
 
-float gridSDF(vec3 p) {
+float gridSDF(vec3 p, int frame) {
     // take the floor of the point to create a grid snapping effect and use this as the coordinate
     
     // if (p.z > 2.7) {
@@ -117,7 +117,7 @@ float gridSDF(vec3 p) {
     // if (p.x < -0.51) {
     //     // offset = 1.5;
     // }
-    p = modShiftXY(p, 0.5, 1.5 + sin(float(iFrame) * 0.1) * 0.3);
+    p = modShiftXY(p, 0.5, 1.5 + sin(float(frame) * 0.1) * 0.3);
     p = modShiftZ(p, 1.0, 1.5);
     // p = modShiftXYZ(p, 1.0, 1.5);
     
@@ -131,19 +131,19 @@ float gridSDF(vec3 p) {
 
 
 // signed distance field function for the whole scene
-float sceneSDF(vec3 p) {
+float sceneSDF(vec3 p, int frame) {
     // return sphereArraySDF(p);
     // return tutorialMatrix(p);
-    return gridSDF(p);
+    return gridSDF(p, frame);
     // return min(sphere1SDF(p), sphere2SDF(p));
 }
 
-float trace(vec3 origin, vec3 rayDirection, float cameraFrontClip) {
+float trace(vec3 origin, vec3 rayDirection, float cameraFrontClip, int frame) {
     float depth = cameraFrontClip;
     // 
     for(int i = 0; i < MAX_MARCHING_STEPS; i++) {
         // find out whether the current position along the ray is 'within(negative value or less than "epsilon")' the SDF function
-        float sdfResult = sceneSDF(origin + rayDirection * depth); 
+        float sdfResult = sceneSDF(origin + rayDirection * depth, frame); 
             // this implementation of depth incrementation should ensure that this result is always positive for a sphere 
         
         // if we're inside the sphere(or close enough), return the distance or depth        
@@ -163,6 +163,39 @@ float trace(vec3 origin, vec3 rayDirection, float cameraFrontClip) {
     return MAX_DISTANCE;
 }
 
+struct configObject {
+    int test;
+};
+
+vec4 obtainMainPurpleBallColor(vec3 rayDirection, float timeOffset) {
+    vec4 fragColor;
+    
+    // define camera eye, assume up is straight up (0,1,0) for simplicity
+    vec3 eye = vec3(0.0, 0.0, 10.0 + timeOffset);
+
+    // trace result will be at the max distance if the ray didn't hit anything.
+    // trace result will be less than that if it did hit something. Colorize this appropriately.
+        // the result will be some distance along the ray which specifies the vector in relation to the eye. 
+    float traceResult = trace(eye, rayDirection, 0.0, iFrame);
+    
+    // determine surface normal
+    vec3 surfacePoint = eye + rayDirection * traceResult;
+    vec3 surfaceNormal = getSurfaceNormal(surfacePoint, iFrame);
+
+
+    // Output to screen
+    // if nothing is hit, output black, else output red
+    if (traceResult > MAX_DISTANCE - EPSILON) {
+        fragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    } else {
+        // vec3 getPhongColor(vec3 surfaceNormal, vec3 lightPosition, vec3 cameraPosition, vec3 vertexPosition, vec3 lightColor, vec3 ambientLight, vec3 diffuseColor, float specularity, vec3 specularColor) {
+        //float fog = 1.0 / (1.0 + traceResult * traceResult * 0.1);
+        vec3 color = getPhongColor(surfaceNormal, vec3(5.0,5.0,5.0 + timeOffset), eye, surfacePoint, vec3(1.0,1.0,1.0),vec3(0.2,0.2,0.2), vec3(1.0, 0.2, 1.0), 10.0, vec3(1.0,1.0,1.0));
+        fragColor = vec4(color, 1.0);
+        //fragColor = vec4(vec3(fog), 1.0);
+    }
+    return fragColor;
+}
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
@@ -175,32 +208,15 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // correct x scale for aspect ratio, assume x value of iResolution is greater than y. 
     uv.x = uv.x * iResolution.x / iResolution.y;
     
-    float test = mod(iTime * 2.0, 1.5);
-    
-    // define camera eye, assume up is straight up (0,1,0) for simplicity
-    vec3 eye = vec3(0.0, 0.0, 10.0 + test);
-
     // ray direction - direction from eye that we'll send out rays
     // picking -1.0 for z means we'll slightly wider than 90 degree fov since x value of aspect is wider
     vec3 rayDirection = normalize(vec3(uv, -iResolution.x / iResolution.y));
+    float timeOffset = mod(iTime * 2.0, 1.5);
+
+    float delay = 0.2;
+    vec3 eyeDelay = vec3(0.0, 0.0, 10.0 + timeOffset - delay);
+
+    fragColor = obtainMainPurpleBallColor(rayDirection, timeOffset);
     
-    // trace result will be at the max distance if the ray didn't hit anything.
-    // trace result will be less than that if it did hit something. Colorize this appropriately.
-        // the result will be some distance along the ray which specifies the vector in relation to the eye. 
-    float traceResult = trace(eye, rayDirection, 0.0);
-    vec3 surfacePoint = eye + rayDirection * traceResult;
-    vec3 surfaceNormal = getSurfaceNormal(surfacePoint);
-
-    // Output to screen
-    // if nothing is hit, output black, else output red
-    if (traceResult > MAX_DISTANCE - EPSILON) {
-
-        fragColor = vec4(0.0, 0.0, 0.0, 1.0);
-    } else {
-        // vec3 getPhongColor(vec3 surfaceNormal, vec3 lightPosition, vec3 cameraPosition, vec3 vertexPosition, vec3 lightColor, vec3 ambientLight, vec3 diffuseColor, float specularity, vec3 specularColor) {
-        //float fog = 1.0 / (1.0 + traceResult * traceResult * 0.1);
-        vec3 color = getPhongColor(surfaceNormal, vec3(5.0,5.0,5.0 + test), eye, surfacePoint, vec3(1.0,1.0,1.0),vec3(0.2,0.2,0.2), vec3(1.0, 0.2, 1.0), 10.0, vec3(1.0,1.0,1.0));
-        fragColor = vec4(color, 1.0);
-        //fragColor = vec4(vec3(fog), 1.0);
-    }
+    
 }
