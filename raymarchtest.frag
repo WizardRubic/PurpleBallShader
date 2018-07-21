@@ -1,8 +1,7 @@
-#define MAX_MARCHING_STEPS 1000
+#define MAX_MARCHING_STEPS 2000
 #define EPSILON 0.0001
 #define MAX_DISTANCE 100.0000000 
 #define ARBITRARY_STEP_SIZE 0.01
-
 
 float sceneSDF(vec3 p);
 
@@ -90,6 +89,19 @@ vec3 modShiftXYZ(vec3 p, float negativeCorrection, float spacingBetweenIteration
     return p;
 }
 
+vec3 modShiftXY(vec3 p, float negativeCorrection, float spacingBetweenIteration) {
+    p.x = mod(p.x + negativeCorrection, spacingBetweenIteration) - negativeCorrection;
+    p.y = mod(p.y + negativeCorrection, spacingBetweenIteration) - negativeCorrection;
+    return p;
+}
+
+vec3 modShiftZ(vec3 p, float negativeCorrection, float spacingBetweenIteration) {
+    p.z = mod(p.z + negativeCorrection, spacingBetweenIteration) - negativeCorrection;
+    return p;
+}
+
+
+
 float gridSDF(vec3 p) {
     // take the floor of the point to create a grid snapping effect and use this as the coordinate
     
@@ -101,7 +113,13 @@ float gridSDF(vec3 p) {
         return MAX_DISTANCE;
     }
 
-    p = modShiftXYZ(p, 0.5, 1.5);
+    float offset = 0.0;
+    // if (p.x < -0.51) {
+    //     // offset = 1.5;
+    // }
+    p = modShiftXY(p, 0.5, 1.5 + sin(float(iFrame) * 0.1) * 0.3);
+    p = modShiftZ(p, 1.0, 1.5);
+    // p = modShiftXYZ(p, 1.0, 1.5);
     
 
     // vec3 gridCoordinate = floor(p);
