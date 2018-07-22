@@ -167,7 +167,8 @@ struct configObject {
     int test;
 };
 
-vec4 obtainMainPurpleBallColor(vec3 rayDirection, float timeOffset) {
+vec4 obtainMainPurpleBallColor(vec3 rayDirection) {
+    float timeOffset = mod(float(iFrame) * 0.05, 1.5); // mod of 1.5 since the spheres repeat every 1.5 units
     vec4 fragColor;
     
     // define camera eye, assume up is straight up (0,1,0) for simplicity
@@ -198,21 +199,23 @@ vec4 obtainMainPurpleBallColor(vec3 rayDirection, float timeOffset) {
 }
 
 
-vec4 obtainPurpleDelayedHalo(vec3 rayDirection, float timeOffset) {
-    float delay = 2.0;
+vec4 obtainPurpleDelayedHalo(vec3 rayDirection) {
+    int delay = 30;
+
+    float timeOffset = mod(float(iFrame - delay) * 0.05, 1.5); // mod of 1.5 since the spheres repeat every 1.5 units
     vec4 fragColor;
     
     // define camera eye, assume up is straight up (0,1,0) for simplicity
-    vec3 eye = vec3(0.0, 0.0, 10.0 + timeOffset - delay);
+    vec3 eye = vec3(0.0, 0.0, 10.0 + timeOffset); // controls z movement
 
     // trace result will be at the max distance if the ray didn't hit anything.
     // trace result will be less than that if it did hit something. Colorize this appropriately.
         // the result will be some distance along the ray which specifies the vector in relation to the eye. 
-    float traceResult = trace(eye, rayDirection, 0.0, iFrame);
+    float traceResult = trace(eye, rayDirection, 0.0, iFrame - delay);
     
     // determine surface normal
     vec3 surfacePoint = eye + rayDirection * traceResult;
-    vec3 surfaceNormal = getSurfaceNormal(surfacePoint, iFrame);
+    vec3 surfaceNormal = getSurfaceNormal(surfacePoint, iFrame - delay);
 
 
     // Output to screen
@@ -243,12 +246,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // ray direction - direction from eye that we'll send out rays
     // picking -1.0 for z means we'll slightly wider than 90 degree fov since x value of aspect is wider
     vec3 rayDirection = normalize(vec3(uv, -iResolution.x / iResolution.y));
-    float timeOffset = mod(float(iFrame) * 0.05, 1.5);
+    
 
-    float delay = 0.2;
-    vec3 eyeDelay = vec3(0.0, 0.0, 10.0 + timeOffset - delay);
-
-    fragColor = obtainMainPurpleBallColor(rayDirection, timeOffset);
+    fragColor = obtainMainPurpleBallColor(rayDirection) * 0.9 + obtainPurpleDelayedHalo(rayDirection) * 0.1;
     
     
 }
