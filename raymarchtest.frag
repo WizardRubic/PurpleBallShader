@@ -198,8 +198,7 @@ vec4 obtainMainPurpleBallColor(vec3 rayDirection) {
     return fragColor;
 }
 
-// TODO
-// refactor to another SDF in the trace and put some kinda check in the trace() function to tell us how to shade. This method is too taxing on gpu
+
 vec4 obtainPurpleDelayedHalo(vec3 rayDirection) {
     int delay = 30;
 
@@ -248,7 +247,6 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // picking -1.0 for z means we'll slightly wider than 90 degree fov since x value of aspect is wider
     vec3 rayDirection = normalize(vec3(uv, -iResolution.x / iResolution.y));
     
-
 
     fragColor = obtainMainPurpleBallColor(rayDirection) * 0.9 + obtainPurpleDelayedHalo(rayDirection) * 0.1;
     
