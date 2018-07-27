@@ -26,18 +26,22 @@ int mandelbulb(vec2 c) {
     float zReal = 0.0;
     float zImaginary = 0.0;
     
-    
     float cReal = c.x;
     float cImaginary = c.y;
     
+    float curZReal = 0.0;
+    float curZImaginary = 0.0;
+
     vec2 testVector;
     //int curCount = 0;
     for(int i = 0; i < MAX_ITERERATIONS; i++) {
-        zReal = pow(zReal, 2.0) - pow(zImaginary, 2.0) + cReal;
-        zImaginary = 2.0 * zReal * zImaginary + cImaginary;
+        curZReal = zReal;
+        curZImaginary = zImaginary;
+        zReal = pow(curZReal, 2.0) - pow(curZImaginary, 2.0) + cReal;
+        zImaginary = 2.0 * curZReal * curZImaginary + cImaginary;
         testVector = vec2(zReal, zImaginary);
         if(length(testVector) > 2.0) { // if out of bounds return the value of i
-            return i;
+            return i - 1;
         }
         
     }
@@ -46,8 +50,7 @@ int mandelbulb(vec2 c) {
 
 // ------------------------------------------------
 // TEST FUNCTIONS
-
-
+// tutorialMandelbulb
 
 // checkCircle()
 // test function
@@ -88,10 +91,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     
     int result = mandelbulb(c);
     float color = float(result) / float(MAX_ITERERATIONS);
-    fragColor = vec4(vec3(color),1.0);
+    fragColor = vec4(color, 0,0,1.0);
     
-    //if(result == 100) {
-    //  fragColor = vec4(1.0,1.0,1.0,1.0);
+    //if(result > 30) {
+    // fragColor = vec4(1.0,0,0,1.0);
     //}
     // ------------------------------------------------
     
