@@ -1,5 +1,27 @@
-#define MAX_ITERERATIONS 32
+/*
+This iterates over the mandelbrot equation, f(z) = z^2 + c.
+The x axis is the real number plane and the y axis denotes imaginary nums.
+z starts off as a complex number 0i + 0. c is the x+y(i) pos of the current pixel.
+The mandelbrot function below steps through the mandelbrot equation over and over
+using the previous value of f(z) as z until the value of f(z) escapes a bounds
+or the max iteration count is hit. The ratio of iterations successfully 
+taken to max iterations is used as the pixel's red percentage. 
 
+The solid parts of the image are parts of the image that the returned value 
+of mandelbrot(c) didn't exceed the bounds. As we got further away, the pixel fell
+out of the bounds. 
+
+The bounds in this image are a circle of radius 2 centered at the center of the 
+screen.
+
+The complex number multiplication has been tweeked to make the mandelbrot 
+stretch and span in a periodic manner. 
+Comment out line 24 to make it not stretch.
+*/
+
+
+#define MAX_ITERERATIONS 32
+#define STRETCH
 
 // return number of iterations it made it to before escaping bounds...
 // c = cur position
@@ -38,11 +60,18 @@ int mandelbulb(vec2 c) {
         curZReal = zReal;
         curZImaginary = zImaginary;
         zReal = pow(curZReal, 2.0) - pow(curZImaginary, 2.0) + cReal;
-        zImaginary = 2.0 * curZReal * curZImaginary + cImaginary;
+        #ifndef STRETCH
+            zImaginary = 2.0 * curZReal * curZImaginary + cImaginary;
+        #else
+            zImaginary = 5.0 * sin(float(iFrame) * 0.01) * curZReal * curZImaginary + cImaginary;
+        #endif
         testVector = vec2(zReal, zImaginary);
         if(length(testVector) > 2.0) { // if out of bounds return the value of i
             return i - 1;
         }
+        //if(testVector.x > 2.0 || testVector.x < -2.0){
+        //    return i - 1;
+        //}
         
     }
     return MAX_ITERERATIONS;
@@ -79,12 +108,6 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     
     
     
-    
-    
-    
-    // ------------------------------------------------
-    // Test output
-    
     fragColor = vec4(0,0,0,1.0);
     
     vec2 c = uv;
@@ -93,6 +116,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     float color = float(result) / float(MAX_ITERERATIONS);
     fragColor = vec4(color, 0,0,1.0);
     
+    
+    // ------------------------------------------------
+    // Test output
     //if(result > 30) {
     // fragColor = vec4(1.0,0,0,1.0);
     //}
