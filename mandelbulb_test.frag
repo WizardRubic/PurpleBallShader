@@ -12,10 +12,10 @@ reuse the rest of the raymarching stuff from the other shader, remove the nonrel
 */
 
 
-#define MAX_MARCHING_STEPS 100
+#define MAX_MARCHING_STEPS 250
 #define EPSILON 0.0001
 #define MAX_DISTANCE 100.0000000 
-#define ARBITRARY_STEP_SIZE 0.2
+#define ARBITRARY_STEP_SIZE 0.08
 
 float sceneSDF(vec3 p, int frame);
 
@@ -66,13 +66,6 @@ float mandelbulb(vec3 c) {
 }
 
 
-// // return distance away from the mandelbulb we are
-// float mandelBulbSDF() {
-//     // mandelbulb
-// }
-
-
-
 // @param
 // takes in a point that is within EPSILON of a surface.
 // to use this function, calculate the current point by 
@@ -104,107 +97,10 @@ vec3 getPhongColor(vec3 surfaceNormal, vec3 lightPosition, vec3 cameraPosition, 
     return vec3(diffuse + ambient + specular);
 }
 
-float sphere1SDF(vec3 p) {
-    p.x = p.x - 1.0;
-    return length(p) - 2.0;
-}
-
-float sphere2SDF(vec3 p) {
-    p.x = p.x + 1.0;
-    return length(p) - 2.0;
-}
-
-float sphereSDF(vec3 p, vec3 coords, float size) {
-    p.x = p.x - coords.x;
-    p.y = p.y - coords.y;
-    p.z = p.z - coords.z;
-    return length(p) - size;
-}
-
-// array of spheres function
-
-float sphereArraySDF(vec3 p) {
-    // iterate through all the sphere positions and figure out which is the closest
-    // sphere positions are from with spacing centers out by 4
-    vec2 coords;
-    float currentMinimum = MAX_DISTANCE;
-    float testValue = 0.0;
-    for(int i = 0; i < 5; i++) {
-        for(int j = 0; j < 5; j++) {
-            coords = vec2(i, j);
-            testValue = sphereSDF(p, vec3(coords, 0.0), 0.5);
-            if(testValue < currentMinimum) {
-                currentMinimum = testValue;
-            }
-                
-        }
-    }
-    return currentMinimum;
-}
-
-// matrix grid using fract function
-// source https://www.youtube.com/watch?v=yxNnRSefK94&t=332s
-float tutorialMatrix(vec3 p) {
-    vec3 q = fract(p) * 2.0 - 1.0;
-    return length(q) - 0.25;
-}
-
-
-vec3 modShiftXYZ(vec3 p, float negativeCorrection, float spacingBetweenIteration) {
-    p.x = mod(p.x + negativeCorrection, spacingBetweenIteration) - negativeCorrection;
-    p.y = mod(p.y + negativeCorrection, spacingBetweenIteration) - negativeCorrection;
-    p.z = mod(p.z + negativeCorrection, spacingBetweenIteration) - negativeCorrection;
-    return p;
-}
-
-vec3 modShiftXY(vec3 p, float negativeCorrection, float spacingBetweenIteration) {
-    p.x = mod(p.x + negativeCorrection, spacingBetweenIteration) - negativeCorrection;
-    p.y = mod(p.y + negativeCorrection, spacingBetweenIteration) - negativeCorrection;
-    return p;
-}
-
-vec3 modShiftZ(vec3 p, float negativeCorrection, float spacingBetweenIteration) {
-    p.z = mod(p.z + negativeCorrection, spacingBetweenIteration) - negativeCorrection;
-    return p;
-}
-
-
-
-float gridSDF(vec3 p, int frame) {
-    // take the floor of the point to create a grid snapping effect and use this as the coordinate
-    
-    // if (p.z > 2.7) {
-    //     return MAX_DISTANCE;
-    // }
-
-    if ((p.x < 0.51) && (p.x > -0.51) &&(p.y > -0.51) &&(p.y < 0.51)) {
-        return MAX_DISTANCE;
-    }
-
-    float offset = 0.0;
-    // if (p.x < -0.51) {
-    //     // offset = 1.5;
-    // }
-    p = modShiftXY(p, 0.5, 1.5 + sin(float(frame) * 0.1) * 0.3);
-    p = modShiftZ(p, 1.0, 1.5);
-    // p = modShiftXYZ(p, 1.0, 1.5);
-    
-
-    // vec3 gridCoordinate = floor(p);
-    // gridCoordinate.z = ceil(p.z);
-    
-    return sphereSDF(p, vec3(0.0,0,0), 0.5);
-    // float dist1 = ()
-}
-
 
 // signed distance field function for the whole scene
 float sceneSDF(vec3 p, int frame) {
-    // return sphereArraySDF(p);
-    // return tutorialMatrix(p);
-    // return gridSDF(p, frame);
     return mandelbulb(p);
-    // return min(sphere1SDF(p), sphere2SDF(p));
 }
 
 float trace(vec3 origin, vec3 rayDirection, float cameraFrontClip, int frame) {
@@ -232,45 +128,6 @@ float trace(vec3 origin, vec3 rayDirection, float cameraFrontClip, int frame) {
     return MAX_DISTANCE;
 }
 
-struct configObject {
-    int test;
-};
-
-
-
-
-vec4 obtainPurpleDelayedHalo(vec3 rayDirection) {
-    int delay = 30;
-
-    float timeOffset = mod(float(iFrame - delay) * 0.05, 1.5); // mod of 1.5 since the spheres repeat every 1.5 units
-    vec4 fragColor;
-    
-    // define camera eye, assume up is straight up (0,1,0) for simplicity
-    vec3 eye = vec3(0.0, 0.0, 10.0 + timeOffset); // controls z movement
-
-    // trace result will be at the max distance if the ray didn't hit anything.
-    // trace result will be less than that if it did hit something. Colorize this appropriately.
-        // the result will be some distance along the ray which specifies the vector in relation to the eye. 
-    float traceResult = trace(eye, rayDirection, 0.0, iFrame - delay);
-    
-    // determine surface normal
-    vec3 surfacePoint = eye + rayDirection * traceResult;
-    vec3 surfaceNormal = getSurfaceNormal(surfacePoint, iFrame - delay);
-
-
-    // Output to screen
-    // if nothing is hit, output black, else output red
-    if (traceResult > MAX_DISTANCE - EPSILON) {
-        fragColor = vec4(0.0, 0.0, 0.0, 1.0);
-    } else {
-        // vec3 getPhongColor(vec3 surfaceNormal, vec3 lightPosition, vec3 cameraPosition, vec3 vertexPosition, vec3 lightColor, vec3 ambientLight, vec3 diffuseColor, float specularity, vec3 specularColor) {
-        //float fog = 1.0 / (1.0 + traceResult * traceResult * 0.1);
-        vec3 color = getPhongColor(surfaceNormal, vec3(5.0,5.0,5.0 + timeOffset), eye, surfacePoint, vec3(1.0,1.0,1.0),vec3(0.2,0.2,0.2), vec3(1.0, 0.2, 1.0), 10.0, vec3(1.0,1.0,1.0));
-        fragColor = vec4(color, 1.0);
-        //fragColor = vec4(vec3(fog), 1.0);
-    }
-    return fragColor;
-}
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
@@ -308,8 +165,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     } else {
         // vec3 getPhongColor(vec3 surfaceNormal, vec3 lightPosition, vec3 cameraPosition, vec3 vertexPosition, vec3 lightColor, vec3 ambientLight, vec3 diffuseColor, float specularity, vec3 specularColor) {
         //float fog = 1.0 / (1.0 + traceResult * traceResult * 0.1);
-        vec3 color = getPhongColor(surfaceNormal, vec3(5.0,5.0,5.0), eye, surfacePoint, vec3(1.0,1.0,1.0),vec3(0.2,0.2,0.2), vec3(1.0, 0.2, 1.0), 10.0, vec3(1.0,1.0,1.0));
-        fragColor = vec4(color, 1.0);
+        //vec3 color = getPhongColor(surfaceNormal, vec3(5.0,5.0,5.0), eye, surfacePoint, vec3(1.0,1.0,1.0),vec3(0.2,0.2,0.2), vec3(1.0, 0.2, 1.0), 10.0, vec3(1.0,1.0,1.0));
+        fragColor = vec4(vec3((surfacePoint.z + 2.0) / 3.0), 1.0);
         //fragColor = vec4(vec3(fog), 1.0);
     }
     
