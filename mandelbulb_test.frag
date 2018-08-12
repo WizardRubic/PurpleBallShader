@@ -4,16 +4,74 @@ modification to the ray march program to ray march a mandelbulb fractal
 
 TODO
 add a mandelbulb function. probably put the values of r, theta, and phi into different functions
+    this function should take in a value of c that's a 3d coordinate this time. v will start off at (0,0,0) again. 
+    the mandelbulb function should prob start with power of 2 just to avoid complications. 
+    
 
+reuse the rest of the raymarching stuff from the other shader, remove the nonrelevant parts
 */
 
 
-#define MAX_MARCHING_STEPS 1000
+#define MAX_MARCHING_STEPS 100
 #define EPSILON 0.0001
 #define MAX_DISTANCE 100.0000000 
-#define ARBITRARY_STEP_SIZE 0.02
+#define ARBITRARY_STEP_SIZE 0.2
 
 float sceneSDF(vec3 p, int frame);
+
+float getR(vec3 xyz){
+    return pow(pow(xyz.x, 2.0) + pow(xyz.y, 2.0) + pow(xyz.z, 2.0), 0.5);
+}
+
+float getPhi(vec3 xyz) {
+    return atan(xyz.y / xyz.x);
+}
+
+float getTheta(vec3 xyz) {
+    return atan(pow(pow(xyz.x,2.0) + pow(xyz.y,2.0),0.5) / xyz.z);
+}
+
+// mandelbulb equation is: v->v^n+c, 
+// 1. we iterate through this formula over a high number of iterations.
+// 2. when the high number of iterations is done, if we're still in some 
+// predefined bounds, we'll go and say it's part of the mandelbulb. 
+// 3. if it is part of the mandelbulb we return 0.
+// 4. if it's not part of the mandelbulb we're prob ok to return super
+// high value to tell ray marcher don't render!
+// return whether or not the point given is part of the mandelbulb
+// I will use n = 8 and bound it to circle of radius 2 to start
+float mandelbulb(vec3 c) {
+    //https://en.wikipedia.org/wiki/Mandelbulb
+    float exponent = 8.0;
+    float r;
+    float phi;
+    float theta;
+    vec3 vecCalc = vec3(0.0, 0.0, 0.0);
+    for(int i = 0; i < 32; i++) {
+        exponent = 8.0;
+        r = getR(vecCalc);
+        phi = getPhi(vecCalc);
+        theta = getTheta(vecCalc);
+        vecCalc = vec3(
+            pow(r, exponent) * sin(exponent * theta) * cos(exponent * phi),
+            pow(r, exponent) * sin(exponent * theta) * sin(exponent * phi),
+            pow(r, exponent) * cos(exponent * theta)
+            );
+        vecCalc += c;
+        if(length(vecCalc) > 2.0) {
+            return 9999.99; // indicate outside by saying we're super far
+        }
+    }
+    return 0.0;
+}
+
+
+// // return distance away from the mandelbulb we are
+// float mandelBulbSDF() {
+//     // mandelbulb
+// }
+
+
 
 // @param
 // takes in a point that is within EPSILON of a surface.
@@ -144,7 +202,8 @@ float gridSDF(vec3 p, int frame) {
 float sceneSDF(vec3 p, int frame) {
     // return sphereArraySDF(p);
     // return tutorialMatrix(p);
-    return gridSDF(p, frame);
+    // return gridSDF(p, frame);
+    return mandelbulb(p);
     // return min(sphere1SDF(p), sphere2SDF(p));
 }
 
@@ -177,36 +236,7 @@ struct configObject {
     int test;
 };
 
-vec4 obtainMainPurpleBallColor(vec3 rayDirection) {
-    float timeOffset = mod(float(iFrame) * 0.05, 1.5); // mod of 1.5 since the spheres repeat every 1.5 units
-    vec4 fragColor;
-    
-    // define camera eye, assume up is straight up (0,1,0) for simplicity
-    vec3 eye = vec3(0.0, 0.0, 10.0 + timeOffset);
 
-    // trace result will be at the max distance if the ray didn't hit anything.
-    // trace result will be less than that if it did hit something. Colorize this appropriately.
-        // the result will be some distance along the ray which specifies the vector in relation to the eye. 
-    float traceResult = trace(eye, rayDirection, 0.0, iFrame);
-    
-    // determine surface normal
-    vec3 surfacePoint = eye + rayDirection * traceResult;
-    vec3 surfaceNormal = getSurfaceNormal(surfacePoint, iFrame);
-
-
-    // Output to screen
-    // if nothing is hit, output black, else output red
-    if (traceResult > MAX_DISTANCE - EPSILON) {
-        fragColor = vec4(0.0, 0.0, 0.0, 1.0);
-    } else {
-        // vec3 getPhongColor(vec3 surfaceNormal, vec3 lightPosition, vec3 cameraPosition, vec3 vertexPosition, vec3 lightColor, vec3 ambientLight, vec3 diffuseColor, float specularity, vec3 specularColor) {
-        //float fog = 1.0 / (1.0 + traceResult * traceResult * 0.1);
-        vec3 color = getPhongColor(surfaceNormal, vec3(5.0,5.0,5.0 + timeOffset), eye, surfacePoint, vec3(1.0,1.0,1.0),vec3(0.2,0.2,0.2), vec3(1.0, 0.2, 1.0), 10.0, vec3(1.0,1.0,1.0));
-        fragColor = vec4(color, 1.0);
-        //fragColor = vec4(vec3(fog), 1.0);
-    }
-    return fragColor;
-}
 
 
 vec4 obtainPurpleDelayedHalo(vec3 rayDirection) {
@@ -258,7 +288,29 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec3 rayDirection = normalize(vec3(uv, -iResolution.x / iResolution.y));
     
 
-    fragColor = obtainMainPurpleBallColor(rayDirection) * 0.9 + obtainPurpleDelayedHalo(rayDirection) * 0.1;
+    // define camera eye, assume up is straight up (0,1,0) for simplicity
+    vec3 eye = vec3(0.0, 0.0, 2.0);
+
+    // trace result will be at the max distance if the ray didn't hit anything.
+    // trace result will be less than that if it did hit something. Colorize this appropriately.
+        // the result will be some distance along the ray which specifies the vector in relation to the eye. 
+    float traceResult = trace(eye, rayDirection, 0.0, iFrame);
     
+    // determine surface normal
+    vec3 surfacePoint = eye + rayDirection * traceResult;
+    vec3 surfaceNormal = getSurfaceNormal(surfacePoint, iFrame);
+
+
+    // Output to screen
+    // if nothing is hit, output black, else output red
+    if (traceResult > MAX_DISTANCE - EPSILON) {
+        fragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    } else {
+        // vec3 getPhongColor(vec3 surfaceNormal, vec3 lightPosition, vec3 cameraPosition, vec3 vertexPosition, vec3 lightColor, vec3 ambientLight, vec3 diffuseColor, float specularity, vec3 specularColor) {
+        //float fog = 1.0 / (1.0 + traceResult * traceResult * 0.1);
+        vec3 color = getPhongColor(surfaceNormal, vec3(5.0,5.0,5.0), eye, surfacePoint, vec3(1.0,1.0,1.0),vec3(0.2,0.2,0.2), vec3(1.0, 0.2, 1.0), 10.0, vec3(1.0,1.0,1.0));
+        fragColor = vec4(color, 1.0);
+        //fragColor = vec4(vec3(fog), 1.0);
+    }
     
 }
