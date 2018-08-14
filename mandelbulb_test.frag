@@ -129,6 +129,35 @@ float trace(vec3 origin, vec3 rayDirection, float cameraFrontClip, int frame) {
 }
 
 
+// take in a point, rotate around x axis with pivot at 0,0,0
+// pass in 0, 1, 2 for xyz to axis
+// return rotated point
+vec3 rotate(vec3 point, float degree, int axis) {
+    // define multiplication matrix
+    mat3 r;
+    if (axis == 0) {
+        r = mat3(vec3(1.0, 0, 0),vec3(0, cos(degree), sin(degree)),vec3(0, -sin(degree), cos(degree)));
+    } else if(axis == 1) {
+        r = mat3(vec3(cos(degree), 0, -1.0 * sin(degree)),vec3(0, 1.0, 0),vec3(sin(degree), 0, cos(degree)));
+    } // TODO type up z axis rot matrix
+    
+    // multiply the matrix 
+    return r * point;
+}
+
+//take in eye as well as a point and rotate point around the eye
+// can be used for ray direction to figure out the appropriate rotation
+vec3 rotate(vec3 point, vec3 eye) {
+    return vec3(0,0,0);
+}
+
+//take in target, eye, point
+// return point rotated so that camera will face the target
+vec3 rotate(vec3 point, vec3 eye, vec3 target){
+    return vec3(0,0,0);
+}
+
+
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     // Normalized pixel coordinates (from 0 to 1)
@@ -143,10 +172,11 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // ray direction - direction from eye that we'll send out rays
     // picking -1.0 for z means we'll slightly wider than 90 degree fov since x value of aspect is wider
     vec3 rayDirection = normalize(vec3(uv, -iResolution.x / iResolution.y));
-    
+
+    rayDirection = rotate(rayDirection, 1.0, 0);    
 
     // define camera eye, assume up is straight up (0,1,0) for simplicity
-    vec3 eye = vec3(0.0, 0.0, 2.0);
+    vec3 eye = vec3(0.0, -1.5, 1.0);
 
     // trace result will be at the max distance if the ray didn't hit anything.
     // trace result will be less than that if it did hit something. Colorize this appropriately.
@@ -166,7 +196,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         // vec3 getPhongColor(vec3 surfaceNormal, vec3 lightPosition, vec3 cameraPosition, vec3 vertexPosition, vec3 lightColor, vec3 ambientLight, vec3 diffuseColor, float specularity, vec3 specularColor) {
         //float fog = 1.0 / (1.0 + traceResult * traceResult * 0.1);
         //vec3 color = getPhongColor(surfaceNormal, vec3(5.0,5.0,5.0), eye, surfacePoint, vec3(1.0,1.0,1.0),vec3(0.2,0.2,0.2), vec3(1.0, 0.2, 1.0), 10.0, vec3(1.0,1.0,1.0));
-        fragColor = vec4(vec3((surfacePoint.z + 2.0) / 3.0), 1.0);
+        fragColor = vec4(vec3((surfacePoint.z + 0.3) / 1.0), 1.0);
         //fragColor = vec4(vec3(fog), 1.0);
     }
     
