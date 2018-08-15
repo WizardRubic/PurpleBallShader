@@ -12,10 +12,17 @@ reuse the rest of the raymarching stuff from the other shader, remove the nonrel
 */
 
 
-#define MAX_MARCHING_STEPS 250
+#define MAX_MARCHING_STEPS 500
 #define EPSILON 0.0001
 #define MAX_DISTANCE 100.0000000 
-#define ARBITRARY_STEP_SIZE 0.08
+#define ARBITRARY_STEP_SIZE 0.04
+
+#define MAX_MANDELBULB_ITERATIONS 32
+
+struct MandelbulbTracePacket {
+    float depth;
+    float iterations;
+};
 
 float sceneSDF(vec3 p, int frame);
 
@@ -47,7 +54,7 @@ float mandelbulb(vec3 c) {
     float phi;
     float theta;
     vec3 vecCalc = vec3(0.0, 0.0, 0.0);
-    for(int i = 0; i < 32; i++) {
+    for(int i = 0; i < MAX_MANDELBULB_ITERATIONS; i++) {
         exponent = 8.0;
         r = getR(vecCalc);
         phi = getPhi(vecCalc);
@@ -59,10 +66,12 @@ float mandelbulb(vec3 c) {
             );
         vecCalc += c;
         if(length(vecCalc) >= 2.0) {
-            return 9999.99; // indicate outside by saying we're super far
+            // int iterations = i;
+            return float(i);
+            // return 9999.99; // indicate outside by saying we're super far
         }
     }
-    return 0.0;
+    return float(MAX_MANDELBULB_ITERATIONS);
 }
 
 
@@ -103,17 +112,16 @@ float sceneSDF(vec3 p, int frame) {
     return mandelbulb(p);
 }
 
-float trace(vec3 origin, vec3 rayDirection, float cameraFrontClip, int frame) {
+MandelbulbTracePacket trace(vec3 origin, vec3 rayDirection, float cameraFrontClip, int frame) {
     float depth = cameraFrontClip;
-    // 
+    MandelbulbTracePacket ret;
     for(int i = 0; i < MAX_MARCHING_STEPS; i++) {
-        // find out whether the current position along the ray is 'within(negative value or less than "epsilon")' the SDF function
-        float sdfResult = sceneSDF(origin + rayDirection * depth, frame); 
-            // this implementation of depth incrementation should ensure that this result is always positive for a sphere 
-        
-        // if we're inside the sphere(or close enough), return the distance or depth        
-        if (sdfResult < EPSILON) {
-            return depth;
+        float sdfResult = sceneSDF(origin + rayDirection * depth, frame);  // number of iterations we made it to with mandel equation
+
+        // if we're inside the mandelbulb or close to it, return the iterations it made it to b4 esc and depth        
+        if (sdfResult > 2.0) {
+            ret = MandelbulbTracePacket(depth, sdfResult);
+            return ret;
         }
 
         // if we're still outside the sphere, increment by the distance away or depth we are in the same direction
@@ -122,10 +130,10 @@ float trace(vec3 origin, vec3 rayDirection, float cameraFrontClip, int frame) {
         depth = depth + ARBITRARY_STEP_SIZE;
         // if we're past the max depth then we'll return END and we'll terminate 
         if (depth >= MAX_DISTANCE) {
-            return MAX_DISTANCE;
+            return MandelbulbTracePacket(MAX_DISTANCE, 0.0); // not part of mandelbulb
         }
     }
-    return MAX_DISTANCE;
+    return MandelbulbTracePacket(MAX_DISTANCE, 0.0); // not part of mandelbulb
 }
 
 
@@ -328,22 +336,27 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // trace result will be at the max distance if the ray didn't hit anything.
     // trace result will be less than that if it did hit something. Colorize this appropriately.
         // the result will be some distance along the ray which specifies the vector in relation to the eye. 
-    float traceResult = trace(eye, rayDirection, 0.0, iFrame);
-    
+    MandelbulbTracePacket tr = trace(eye, rayDirection, 0.0, iFrame);
+    float depth = tr.depth; 
+    float iterations = tr.iterations; // either 0.0 or 20-32 or Max_distance, if max_distance not part of bulb
     // determine surface normal
-    vec3 surfacePoint = eye + rayDirection * traceResult;
+    vec3 surfacePoint = eye + rayDirection * depth;
     vec3 surfaceNormal = getSurfaceNormal(surfacePoint, iFrame);
 
 
     // Output to screen
     // if nothing is hit, output black, else output red
-    if (traceResult > MAX_DISTANCE - EPSILON) {
+    if (iterations < 0.0 + EPSILON) {
         fragColor = vec4(0.0, 0.0, 0.0, 1.0);
     } else {
         // vec3 getPhongColor(vec3 surfaceNormal, vec3 lightPosition, vec3 cameraPosition, vec3 vertexPosition, vec3 lightColor, vec3 ambientLight, vec3 diffuseColor, float specularity, vec3 specularColor) {
         //float fog = 1.0 / (1.0 + traceResult * traceResult * 0.1);
         //vec3 color = getPhongColor(surfaceNormal, vec3(5.0,5.0,5.0), eye, surfacePoint, vec3(1.0,1.0,1.0),vec3(0.2,0.2,0.2), vec3(1.0, 0.2, 1.0), 10.0, vec3(1.0,1.0,1.0));
-        fragColor = vec4(vec3((surfacePoint.z + 0.3) / 1.0), 1.0);
+        if(iterations < float(MAX_MANDELBULB_ITERATIONS)-EPSILON) {
+            fragColor = vec4((iterations / float(MAX_MANDELBULB_ITERATIONS)) * vec3((surfacePoint.z + 0.3) / 1.0), 1.0);
+        } else {
+            fragColor = vec4(vec3((surfacePoint.z + 0.3) / 1.0), 1.0);
+        }
         //fragColor = vec4(vec3(fog), 1.0);
     }
     
