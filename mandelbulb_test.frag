@@ -145,16 +145,100 @@ vec3 rotate(vec3 point, float degree, int axis) {
     return r * point;
 }
 
-//take in eye as well as a point and rotate point around the eye
-// can be used for ray direction to figure out the appropriate rotation
-vec3 rotate(vec3 point, vec3 eye) {
-    return vec3(0,0,0);
-}
 
-//take in target, eye, point
+// I believe a function to rotate around the eye to be unnecessary 
+// ray marching happens from the eye no matter what and the ray 
+// direction is the only thing that needs to change which
+// is independent from eye location
+
+// //take in eye as well as a point and rotate point around the eye
+// // can be used for ray direction to figure out the appropriate rotation
+// vec3 rotate(vec3 point, vec3 eye, float degree, int axis) {
+//     // 1. move to the center
+//     // 2. rotate around desired axis 
+//     // 3. move back
+//     point - eye
+//     return vec3(0,0,0);
+// }
+
+
+//take in unrotated point, eye, target
+// the point should be facing off into the negative z axis and shouldn't have 
+// had any other rotation applied to it
 // return point rotated so that camera will face the target
 vec3 rotate(vec3 point, vec3 eye, vec3 target){
-    return vec3(0,0,0);
+    // we want local rotations on the x axis rotation since it's too hard to
+    // calculate necessary rotation after we rotate it around y axis
+
+    // 1. move the whole system to the origin by point - eye
+    // 2. we now have 2 vectors, the vector coming out of the origin pointing in neg z axis and the xy vector from the origin to the target
+    // 3. use cosine rule to determine the angle between em and rotate around the y axis. 
+    // 4. use cosine rule between vector pointing out in the negative x direction and the xy vector of the target  
+    // 5. put the 2 rotations together (should create a local rotation on the second one), apply to the point 
+    // 6. move everything back
+
+    //1. move the points
+    vec3 origin = vec3(0.0,0.0,0.0);
+    target = target - eye;
+    point = point - eye;
+
+    // 2. determine the 2 vectors that determine the rotation around the y axis
+    vec2 v1 = vec2(0.0,-1.0); //(x,z)
+    vec2 v2 = vec2(target.x, target.z); // (x,z)
+
+    // 3. determine the angle needed around the y axis
+    float yAngleInRadians;
+    if(target.x==0.0) {
+        yAngleInRadians = 0.0;
+    } else if(target.x == 180.0) {
+        yAngleInRadians = 180.0;
+    } else {
+        yAngleInRadians = acos((dot(v1,v2))/(length(v1)*length(v2)));
+    }
+
+    // 4. determine the angle between the x axis
+    vec2 v3;
+    vec2 v4;
+    float xAngleInRadians;
+    if(yAngleInRadians > 0.0) {
+        v3 = vec2(-1.0,0.0); // (x,y)
+        v4 = vec2(target.x, target.y); // (x,y)
+        xAngleInRadians = acos((dot(v3,v4))/(length(v3)*length(v4)));
+    } else if(yAngleInRadians > 0.0) {
+        v3 = vec2(1.0,0.0); //(x,y)
+        v4 = vec2(target.x, target.y); // (x,y)
+        xAngleInRadians = acos((dot(v3,v4))/(length(v3)*length(v4)));
+    } else if(yAngleInRadians == 0.0) { // ==0
+        // determine the angle between (0,0,-1) and 
+        v3 = vec2(0.0,-1.0); // (y,z)
+        v4 = vec2(target.y, target.z); // (y,z)
+        xAngleInRadians = acos((dot(v3,v4))/(length(v3)*length(v4)));
+    } else if(yAngleInRadians == 180.0) {
+        //(0,0,1.0)
+        v3 = vec2(0.0,1.0); // (y,z)
+        v4 = vec2(target.y, target.z); // (y,z)
+        xAngleInRadians = acos((dot(v3,v4))/(length(v3)*length(v4)));
+    } else {
+        xAngleInRadians = 0.0;
+    }
+
+
+    // 5. apply the rotations
+    mat3 r1;
+    mat3 r2;
+
+    
+    r1 = mat3(vec3(cos(yAngleInRadians), 0, -1.0 * sin(yAngleInRadians)),vec3(0, 1.0, 0),vec3(sin(yAngleInRadians), 0, cos(yAngleInRadians))); // y
+
+    r2 = mat3(vec3(1.0, 0, 0),vec3(0, cos(xAngleInRadians), sin(xAngleInRadians)),vec3(0, -sin(xAngleInRadians), cos(xAngleInRadians))); // x
+
+    point = point; 
+
+    point += eye;
+
+    return point;
+
+    // return vec3(0,0,0);
 }
 
 
@@ -172,11 +256,16 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // ray direction - direction from eye that we'll send out rays
     // picking -1.0 for z means we'll slightly wider than 90 degree fov since x value of aspect is wider
     vec3 rayDirection = normalize(vec3(uv, -iResolution.x / iResolution.y));
-
+    
     rayDirection = rotate(rayDirection, 1.0, 0);    
 
     // define camera eye, assume up is straight up (0,1,0) for simplicity
     vec3 eye = vec3(0.0, -1.5, 1.0);
+    
+    
+    // vec3 point, vec3 eye, vec3 target)
+    
+    rayDirection = rotate(rayDirection, eye, vec3(0,0,0));
 
     // trace result will be at the max distance if the ray didn't hit anything.
     // trace result will be less than that if it did hit something. Colorize this appropriately.
