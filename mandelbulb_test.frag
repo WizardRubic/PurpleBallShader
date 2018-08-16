@@ -12,10 +12,10 @@ reuse the rest of the raymarching stuff from the other shader, remove the nonrel
 */
 
 
-#define MAX_MARCHING_STEPS 500
+#define MAX_MARCHING_STEPS 250
 #define EPSILON 0.0001
 #define MAX_DISTANCE 100.0000000 
-#define ARBITRARY_STEP_SIZE 0.04
+#define ARBITRARY_STEP_SIZE 0.1
 
 #define MAX_MANDELBULB_ITERATIONS 32
 
@@ -47,18 +47,24 @@ float getTheta(vec3 xyz) {
 // high value to tell ray marcher don't render!
 // return whether or not the point given is part of the mandelbulb
 // I will use n = 8 and bound it to circle of radius 2 to start
-float mandelbulb(vec3 c) {
+MandelbulbTracePacket mandelbulb(vec3 c) {
     //https://en.wikipedia.org/wiki/Mandelbulb
     float exponent = 8.0;
     float r;
     float phi;
     float theta;
+    float depth = 0.0;
+    float ddepth = 1.0; // dc/dv
     vec3 vecCalc = vec3(0.0, 0.0, 0.0);
     for(int i = 0; i < MAX_MANDELBULB_ITERATIONS; i++) {
-        exponent = 8.0;
+        depth = length(vecCalc);
+        ddepth = pow(depth, exponent - 1.0) * exponent * dr + 1.0;
+
+        // v to a power is r^n * <sin(n * theta) * cos(n * phi),sin(n * theta) * sin(n * phi),cos(n * theta)>
         r = getR(vecCalc);
         phi = getPhi(vecCalc);
         theta = getTheta(vecCalc);
+
         vecCalc = vec3(
             pow(r, exponent) * sin(exponent * theta) * cos(exponent * phi),
             pow(r, exponent) * sin(exponent * theta) * sin(exponent * phi),
@@ -67,11 +73,11 @@ float mandelbulb(vec3 c) {
         vecCalc += c;
         if(length(vecCalc) >= 2.0) {
             // int iterations = i;
-            return float(i);
+            return MandelbulbTracePacket(0.5 * log(depth) * depth / ddepth,float(i));
             // return 9999.99; // indicate outside by saying we're super far
         }
     }
-    return float(MAX_MANDELBULB_ITERATIONS);
+    return MandelbulbTracePacket(0.5 * log(depth) * depth / ddepth, float(MAX_MANDELBULB_ITERATIONS));
 }
 
 
@@ -252,7 +258,7 @@ vec3 rotate(vec3 point, vec3 eye, vec3 target){
 //    // return vec3(0,0,0);
 
     vec3 F = vec3(target.x - eye.x, target.y - eye.y, target.z - eye.z);
-    vec3 UP = vec3(0,1.0,0);
+    vec3 UP = vec3(0,0.0,1.0);
 
     vec3 f = normalize(F);
 
@@ -307,6 +313,13 @@ M = s ⁡ 0 s ⁡ 1 s ⁡ 2 0 u ⁡ 0 u ⁡ 1 u ⁡ 2 0 - f ⁡ 0 - f ⁡ 1 - f 
 
 }
 
+vec2 determineEye(float time) {
+    float divisor = 1.0;
+    float radius = 0.5;
+    float magnitudeDivisor = pow(1.0 / radius, 0.5);
+    return vec2(cos(time / divisor) / magnitudeDivisor, sin(time / divisor) / magnitudeDivisor);
+}
+
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
@@ -326,7 +339,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // rayDirection = rotate(rayDirection, 0.005, 0);    
 
     // define camera eye, assume up is straight up (0,1,0) for simplicity
-    vec3 eye = vec3(0.0, 1.0, 2.0);
+    vec3 eye = vec3(determineEye(iTime), 2.0);
     
     
     // vec3 point, vec3 eye, vec3 target)
@@ -349,15 +362,33 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     if (iterations < 0.0 + EPSILON) {
         fragColor = vec4(0.0, 0.0, 0.0, 1.0);
     } else {
-        // vec3 getPhongColor(vec3 surfaceNormal, vec3 lightPosition, vec3 cameraPosition, vec3 vertexPosition, vec3 lightColor, vec3 ambientLight, vec3 diffuseColor, float specularity, vec3 specularColor) {
-        //float fog = 1.0 / (1.0 + traceResult * traceResult * 0.1);
-        //vec3 color = getPhongColor(surfaceNormal, vec3(5.0,5.0,5.0), eye, surfacePoint, vec3(1.0,1.0,1.0),vec3(0.2,0.2,0.2), vec3(1.0, 0.2, 1.0), 10.0, vec3(1.0,1.0,1.0));
-        if(iterations < float(MAX_MANDELBULB_ITERATIONS)-EPSILON) {
+        // if (iterations <= 1.0) {
+        //     fragColor = vec4(1.0,0.0,0.0,1.0);
+        // } else if(iterations <= 2.0) {
+        //     fragColor = vec4(0.0,1.0,0.0,1.0);
+        // } else if(iterations <= 3.0) {
+        //     fragColor = vec4(0.0,0.0,1.0,1.0);
+        // } else if(iterations <= 4.0) {
+        //     fragColor = vec4(0.0,1.0,0.0,1.0);
+        // } else if(iterations <= 5.0) {
+        //     fragColor = vec4(1.0,0.0,0.0,1.0);
+        // } else if(iterations <= 6.0) {
+        //     fragColor = vec4(0.0,1.0,0.0,1.0);
+        // } else if(iterations <= 7.0) {
+        //     fragColor = vec4(0.0,0.0,1.0,1.0);
+        // } else if(iterations <= 8.0) {
+        //     fragColor = vec4(0.0,1.0,0.0,1.0);
+        // } else if(iterations <= 9.0) {
+        //     fragColor = vec4(1.0,0.0,0.0,1.0);
+        // } else if(iterations <= 10.0) {
+        //     fragColor = vec4(0.0,1.0,0.0,1.0);
+        // } else {
+        //     fragColor = vec4(1.0,1.0,1.0,1.0);
+        // }
+        if (iterations < float(MAX_MANDELBULB_ITERATIONS)-EPSILON) {
             fragColor = vec4((iterations / float(MAX_MANDELBULB_ITERATIONS)) * vec3((surfacePoint.z + 0.3) / 1.0), 1.0);
         } else {
             fragColor = vec4(vec3((surfacePoint.z + 0.3) / 1.0), 1.0);
         }
-        //fragColor = vec4(vec3(fog), 1.0);
     }
-    
 }
